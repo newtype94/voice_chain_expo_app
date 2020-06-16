@@ -9,9 +9,10 @@ const styles = StyleSheet.create({
     justifyContent: "flex-start",
     alignItems: "center",
     alignSelf: "stretch",
-    backgroundColor: "steelblue",
+    backgroundColor: "#EEEEEE",
     minHeight: DEVICE_HEIGHT,
     maxHeight: DEVICE_HEIGHT,
+    paddingBottom: 130,
   },
   halfScreenContainer: {
     flex: 1,
@@ -32,7 +33,7 @@ const styles = StyleSheet.create({
     maxHeight: 100,
   },
   input: {
-    borderColor: "steelblue",
+    borderColor: "black",
     borderRadius: 4,
     borderWidth: 1,
     height: 48,

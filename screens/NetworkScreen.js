@@ -7,12 +7,14 @@ import {
   ToastAndroid,
   TouchableHighlight,
   ScrollView,
+  Share,
 } from "react-native";
 import { Audio } from "expo-av";
 import * as FileSystem from "expo-file-system";
 import * as Permissions from "expo-permissions";
 import * as SQLite from "expo-sqlite";
 import { Ionicons } from "@expo/vector-icons";
+import * as DocumentPicker from "expo-document-picker";
 
 import axios from "axios";
 
@@ -34,6 +36,7 @@ const NetworkScreen = (props) => {
 
   //About Recording
   const [permitted, setPermitted] = React.useState(false);
+  const [fileName, setFileName] = React.useState("");
   const [recordingDuration, setRecordingDuration] = React.useState(null);
   const [isRecording, setIsRecording] = React.useState(false);
 
@@ -255,15 +258,32 @@ const NetworkScreen = (props) => {
     const info = await FileSystem.getInfoAsync(recording.getURI(), {
       md5: true,
     });
-    console.log(`FILE INFO: ${JSON.stringify(info)}`);
 
-    const newLink = FileSystem.documentDirectory + info.md5 + ".mp3";
+    const newName =
+      (fileName || "recorded") +
+      "___" +
+      userId +
+      "___" +
+      new Date().getTime() +
+      ".mp3";
 
-    const infos = await FileSystem.moveAsync({
-      from: recording.getURI(),
-      to: newLink,
+    await FileSystem.moveAsync({
+      from: info.uri,
+      to: FileSystem.documentDirectory + newName,
     });
-    console.log(`FILE INFO: ${JSON.stringify(infos)}`);
+
+    db.exec(
+      [
+        {
+          sql: "INSERT INTO records (name) VALUES (?)",
+          args: [newName],
+        },
+      ],
+      false,
+      (err, results) => {
+        err ? console.log(err) : console.log(results);
+      }
+    );
 
     await Audio.setAudioModeAsync({
       allowsRecordingIOS: false,
@@ -275,6 +295,11 @@ const NetworkScreen = (props) => {
       playThroughEarpieceAndroid: false,
       staysActiveInBackground: true,
     });
+  }
+
+  async function onFindPressed() {
+    const get = await DocumentPicker.getDocumentAsync();
+    console.log(get);
   }
 
   function onRecordPressed() {
@@ -313,7 +338,7 @@ const NetworkScreen = (props) => {
       </Text>
       <TextInput
         onChangeText={(text) => setUserId(text)}
-        placeholder="Insert your userId"
+        placeholder="user Id"
         style={styles.input}
         value={userId}
         doClose={doClose}
@@ -324,8 +349,25 @@ const NetworkScreen = (props) => {
   ) : (
     <View style={styles.container}>
       <Button onPress={doClose} title="네트워크 연결 해제" color="#f54927" />
+      <Text
+        style={{
+          fontSize: 20,
+          fontWeight: "bold",
+          textAlign: "center",
+        }}
+      >
+        녹음 전 제목을 입력해주세요
+      </Text>
+      <TextInput
+        onChangeText={(text) => setFileName(text)}
+        placeholder="file name"
+        style={styles.input}
+        value={fileName}
+        doClose={doClose}
+        log={log}
+      />
       <View style={styles.recordContainer}>
-        <TouchableHighlight underlayColor="skyblue">
+        <TouchableHighlight underlayColor="skyblue" onPress={onFindPressed}>
           <Ionicons
             name="ios-search"
             size={100}

@@ -13,9 +13,18 @@ const genesisBlock = {
   tx_timeStamp: 1562000000000,
 };
 
-const creatingQuery =
+const createBlocksQuery =
   "create table if not exists blocks (idx integer primary key not null, createdAt int, hash text, previousHash text, tx_userId text, tx_voiceHash text, tx_timeStamp int)";
 const insertQuery =
   "INSERT INTO blocks (idx, createdAt, hash, previousHash, tx_userId, tx_voiceHash, tx_timeStamp) VALUES (?, ?, ?, ?, ?, ?, ?)";
 
-export { url, genesisBlock, creatingQuery, insertQuery };
+const createRecordsQuery =
+  "create table if not exists records (idx integer primary key AUTOINCREMENT, name text not null)";
+
+export {
+  url,
+  genesisBlock,
+  createBlocksQuery,
+  insertQuery,
+  createRecordsQuery,
+};

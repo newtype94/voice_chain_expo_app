@@ -2,8 +2,9 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import * as React from "react";
 
 import TabBarIcon from "../components/TabBarIcon";
-import InfoScreen from "../screens/InfoScreen";
 import NetworkScreen from "./../screens/NetworkScreen";
+import RecordScreen from "./../screens/RecordScreen";
+import WalletScreen from "../screens/WalletScreen";
 
 const BottomTab = createBottomTabNavigator();
 const INITIAL_ROUTE_NAME = "Home";
@@ -24,12 +25,22 @@ export default function BottomTabNavigator({ navigation, route }) {
         }}
       />
       <BottomTab.Screen
-        name="Info"
-        component={InfoScreen}
+        name="Wallet"
+        component={WalletScreen}
         options={{
-          title: "Info",
+          title: "Wallet",
           tabBarIcon: ({ focused }) => (
             <TabBarIcon focused={focused} name="md-book" />
+          ),
+        }}
+      />
+      <BottomTab.Screen
+        name="Record"
+        component={RecordScreen}
+        options={{
+          title: "Record",
+          tabBarIcon: ({ focused }) => (
+            <TabBarIcon focused={focused} name="md-mic" />
           ),
         }}
       />
@@ -42,9 +53,11 @@ function getHeaderTitle(route) {
     route.state?.routes[route.state.index]?.name ?? INITIAL_ROUTE_NAME;
 
   switch (routeName) {
-    case "Info":
-      return "내 정보";
     case "Network":
-      return "블록체인 활동";
+      return "블록체인 접속";
+    case "Wallet":
+      return "내 지갑";
+    case "Record":
+      return "저장된 녹음 파일";
   }
 }
