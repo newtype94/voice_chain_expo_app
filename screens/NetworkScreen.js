@@ -3,11 +3,13 @@ import {
   View,
   Text,
   TextInput,
+  Dimensions,
   Button,
   ToastAndroid,
   TouchableHighlight,
   ScrollView,
   Share,
+  AsyncStorage,
 } from "react-native";
 import { Audio } from "expo-av";
 import * as FileSystem from "expo-file-system";
@@ -23,6 +25,7 @@ import { styles } from "../utils/styles";
 import { getMMSSFromMillis } from "../utils/getMMSSFromMillis";
 import { checkTable, resetDB } from "../utils/tableQuery";
 
+const { width: DEVICE_WIDTH, height: DEVICE_HEIGHT } = Dimensions.get("window");
 const db = SQLite.openDatabase("db.db");
 
 let wSocket = null;
@@ -39,13 +42,20 @@ const NetworkScreen = (props) => {
   const [fileName, setFileName] = React.useState("");
   const [recordingDuration, setRecordingDuration] = React.useState(null);
   const [isRecording, setIsRecording] = React.useState(false);
+  const [stage, setStage] = React.useState("");
 
   const [log, setLog] = React.useState("\n");
 
   React.useEffect(() => {
     checkTable();
     askForPermissions();
+    updateStage();
   }, []);
+
+  async function updateStage() {
+    const gotName = await AsyncStorage.getItem("fileName");
+    setStage(gotName);
+  }
 
   async function askForPermissions() {
     const response = await Permissions.askAsync(Permissions.AUDIO_RECORDING);
@@ -80,25 +90,25 @@ const NetworkScreen = (props) => {
 
   function addPlzHandler(forAdd) {
     db.exec(
-      {
-        sql: insertQuery,
-        args: [
-          forAdd.index,
-          forAdd.createdAt,
-          forAdd.hash,
-          forAdd.previousHash,
-          forAdd.tx_userId,
-          forAdd.tx_voiceHash,
-          forAdd.tx_timeStamp,
-        ],
-      },
+      [
+        {
+          sql: insertQuery,
+          args: [
+            forAdd.index,
+            forAdd.createdAt,
+            forAdd.hash,
+            forAdd.previousHash,
+            forAdd.tx_userId,
+            forAdd.tx_voiceHash,
+            forAdd.tx_timeStamp,
+          ],
+        },
+      ],
       false,
       (err, result) => {
         if (err) console.log(err);
       }
     );
-
-    blocks.push(forAdd);
   }
 
   function onMessage(e) {
@@ -111,7 +121,6 @@ const NetworkScreen = (props) => {
             JSON.stringify(got.data)
         );
         checkPlzHandler(got.data);
-        break;
       case "addPlz":
         setLog(
           log +
@@ -119,19 +128,14 @@ const NetworkScreen = (props) => {
             JSON.stringify(got.data)
         );
         addPlzHandler(got.data);
-        break;
       case "checkResult":
         setLog(
           log +
             "\n[나의 voice hash 검증 요청에 대한 결과 도착]\n" +
             JSON.stringify(got.data)
         );
-        break;
       case "addFailed":
         setLog(log + "\n[블록 전송 실패]");
-        break;
-      default:
-        break;
     }
   }
 
@@ -142,7 +146,6 @@ const NetworkScreen = (props) => {
       true,
       async (err, results) => {
         let lastBlock = results[0].rows[0];
-        console.log(lastBlock);
         let query =
           url.rest +
           `/check?index=${lastBlock.idx}` +
@@ -152,7 +155,6 @@ const NetworkScreen = (props) => {
           `&tx_userId=${lastBlock.tx_userId}` +
           `&tx_voiceHash=${lastBlock.tx_voiceHash}` +
           `&tx_timeStamp=${lastBlock.tx_timeStamp}`;
-        console.log(query);
         const got = await axios.get(query, { crossdomain: true });
         const { isCorrect, isLast } = got.data;
 
@@ -325,6 +327,7 @@ const NetworkScreen = (props) => {
         flex: 1,
         flexDirection: "column",
         justifyContent: "center",
+        alignItems: "center",
       }}
     >
       <Text
@@ -344,33 +347,62 @@ const NetworkScreen = (props) => {
         doClose={doClose}
         log={log}
       />
-      <Button onPress={doOpen} title="네트워크 연결" color="green" />
+      <TouchableHighlight onPress={doOpen}>
+        <Ionicons
+          name="ios-arrow-dropright-circle"
+          size={50}
+          color="darkblue"
+        />
+      </TouchableHighlight>
     </View>
   ) : (
     <View style={styles.container}>
-      <Button onPress={doClose} title="네트워크 연결 해제" color="#f54927" />
-      <Text
-        style={{
-          fontSize: 20,
-          fontWeight: "bold",
-          textAlign: "center",
-        }}
-      >
-        녹음 전 제목을 입력해주세요
-      </Text>
-      <TextInput
-        onChangeText={(text) => setFileName(text)}
-        placeholder="file name"
-        style={styles.input}
-        value={fileName}
-        doClose={doClose}
-        log={log}
-      />
-      <View style={styles.recordContainer}>
+      <View style={styles.networkRow}>
+        <TouchableHighlight
+          style={{
+            backgroundColor: "#d11f3a",
+            borderColor: "#470912",
+            borderWidth: 3,
+            borderRadius: 5,
+            padding: 8,
+          }}
+          onPress={doClose}
+        >
+          <Text style={{ color: "white", fontSize: 17 }}>연결 해제</Text>
+        </TouchableHighlight>
+        <TouchableHighlight
+          style={{
+            backgroundColor: "#9ad7e3",
+            borderColor: "#1c515c",
+            borderWidth: 3,
+            borderRadius: 5,
+            padding: 8,
+          }}
+          onPress={doClose}
+        >
+          <Text style={{ fontSize: 17 }}>stage 음원 검증</Text>
+        </TouchableHighlight>
+        <TouchableHighlight onPress={updateStage}>
+          <Ionicons name="ios-refresh-circle" size={30} color="darkblue" />
+        </TouchableHighlight>
+      </View>
+      <View style={styles.networkRow}>
+        <Text
+          style={{
+            fontSize: 20,
+            fontWeight: "bold",
+            textAlign: "center",
+          }}
+        >
+          On Stage
+        </Text>
+        <Text>{stage.length > 0 ? stage : "비어 있음"}</Text>
+      </View>
+      <View style={styles.networkRow}>
         <TouchableHighlight underlayColor="skyblue" onPress={onFindPressed}>
           <Ionicons
             name="ios-search"
-            size={100}
+            size={80}
             style={[{ opacity: isRecording ? 0.0 : 1.0 }]}
             color="black"
           />
@@ -378,10 +410,18 @@ const NetworkScreen = (props) => {
         <TouchableHighlight underlayColor="skyblue" onPress={onRecordPressed}>
           <Ionicons
             name="ios-mic"
-            size={100}
+            size={80}
             color={isRecording ? "red" : "black"}
           />
         </TouchableHighlight>
+        <TextInput
+          onChangeText={(text) => setFileName(text)}
+          placeholder="file name"
+          style={[styles.input, { opacity: isRecording ? 0.0 : 1.0 }]}
+          value={fileName}
+          doClose={doClose}
+          log={log}
+        />
         <View>
           <Text style={{ color: "red" }}>{isRecording ? "LIVE" : ""}</Text>
           <Ionicons
@@ -393,8 +433,28 @@ const NetworkScreen = (props) => {
           <Text>{_getRecordingTimestamp()}</Text>
         </View>
       </View>
-      <ScrollView style={{ flex: 1 }}>
-        <Text style={{ fontSize: 15 }}>네트워크 기록</Text>
+      <ScrollView
+        style={{
+          flex: 1,
+          minHeight: DEVICE_HEIGHT * 0.5,
+          maxHeight: DEVICE_HEIGHT * 0.5,
+          alignSelf: "stretch",
+          margin: 20,
+          borderWidth: 2,
+          borderRadius: 5,
+          borderColor: "grey",
+        }}
+      >
+        <Text
+          style={{
+            textAlign: "center",
+            fontSize: 15,
+            fontWeight: "bold",
+            paddingVertical: 10,
+          }}
+        >
+          네트워크 기록
+        </Text>
         <Text>{log}</Text>
       </ScrollView>
     </View>

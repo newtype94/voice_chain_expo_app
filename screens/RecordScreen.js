@@ -7,12 +7,14 @@ import {
   View,
   ScrollView,
   Share,
+  AsyncStorage,
 } from "react-native";
 import { Audio } from "expo-av";
 import * as SQLite from "expo-sqlite";
 import * as FileSystem from "expo-file-system";
 import { Ionicons } from "@expo/vector-icons";
 import { styles } from "../utils/styles";
+import { getMMSSFromMillis } from "../utils/getMMSSFromMillis";
 
 const db = SQLite.openDatabase("db.db");
 
@@ -165,32 +167,25 @@ export default class RecordScreen extends React.Component {
     return 0;
   }
 
-  _getMMSSFromMillis(millis) {
-    const totalSeconds = millis / 1000;
-    const seconds = Math.floor(totalSeconds % 60);
-    const minutes = Math.floor(totalSeconds / 60);
-
-    const padWithZero = (number) => {
-      const string = number.toString();
-      if (number < 10) {
-        return "0" + string;
-      }
-      return string;
-    };
-    return padWithZero(minutes) + ":" + padWithZero(seconds);
-  }
-
   _getTimestamp() {
     if (
       this.playbackInstance != null &&
       this.state.playbackInstancePosition != null &&
       this.state.playbackInstanceDuration != null
     ) {
-      return `${this._getMMSSFromMillis(
+      return `${getMMSSFromMillis(
         this.state.playbackInstancePosition
-      )} / ${this._getMMSSFromMillis(this.state.playbackInstanceDuration)}`;
+      )} / ${getMMSSFromMillis(this.state.playbackInstanceDuration)}`;
     }
     return "";
+  }
+
+  async fileClicked(i, name) {
+    if (this.playbackInstance != null) {
+      this.index = i;
+      this._updatePlaybackInstanceForIndex(this.state.shouldPlay);
+    }
+    await AsyncStorage.setItem("fileName", name);
   }
 
   render() {
@@ -336,6 +331,17 @@ export default class RecordScreen extends React.Component {
               >
                 <Ionicons name="ios-square" size={50} color="black" />
               </TouchableHighlight>
+              <TouchableHighlight
+                onPress={() => {
+                  this.update();
+                }}
+              >
+                <Ionicons
+                  name="ios-refresh-circle"
+                  size={30}
+                  color="darkblue"
+                />
+              </TouchableHighlight>
             </View>
           </View>
         </View>
@@ -361,25 +367,23 @@ export default class RecordScreen extends React.Component {
             >
               <TouchableHighlight
                 style={{
-                  backgroundColor: "#edd940",
-                  borderColor: "brown",
+                  backgroundColor: "#9ad7e3",
+                  borderColor: "#1c515c",
                   borderWidth: 1,
+                  borderRadius: 5,
                   padding: 8,
                 }}
                 onPress={() => {
-                  if (this.playbackInstance != null) {
-                    this.index = i;
-                    this._updatePlaybackInstanceForIndex(this.state.shouldPlay);
-                  }
+                  this.fileClicked(i, name);
                 }}
               >
-                <Text style={{ color: "black" }}>{name}</Text>
+                <Text>{name}</Text>
               </TouchableHighlight>
               <TouchableHighlight style={{ marginHorizontal: 20 }}>
-                <Ionicons name="ios-share" size={40} color="black" />
+                <Ionicons name="ios-share" size={40} color="green" />
               </TouchableHighlight>
               <TouchableHighlight>
-                <Ionicons name="ios-trash" size={40} color="black" />
+                <Ionicons name="ios-trash" size={40} color="red" />
               </TouchableHighlight>
             </View>
           ))}

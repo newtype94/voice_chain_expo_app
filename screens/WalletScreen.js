@@ -1,7 +1,5 @@
-import { Ionicons } from "@expo/vector-icons";
-import * as WebBrowser from "expo-web-browser";
 import React, { useEffect, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View, TouchableHighlight } from "react-native";
 import { RectButton, ScrollView } from "react-native-gesture-handler";
 
 import * as SQLite from "expo-sqlite";
@@ -13,10 +11,13 @@ export default function WalletScreen() {
 
   function update() {
     db.transaction((tx) => {
-      tx.executeSql(`select * from blocks`, [], (_, { rows: { _array } }) => {
-        setBlocks(_array);
-        console.log(blocks);
-      });
+      tx.executeSql(
+        `select * from blocks order by idx desc`,
+        [],
+        (_, { rows: { _array } }) => {
+          setBlocks(_array);
+        }
+      );
     });
   }
 
@@ -26,6 +27,20 @@ export default function WalletScreen() {
 
   return (
     <View style={styles.container}>
+      <View style={{ marginTop: 15 }}>
+        <TouchableHighlight
+          style={{
+            backgroundColor: "#d11f3a",
+            borderColor: "#470912",
+            borderWidth: 3,
+            borderRadius: 5,
+            padding: 8,
+          }}
+          onPress={update}
+        >
+          <Text style={{ color: "white", fontSize: 17 }}>새로 고침</Text>
+        </TouchableHighlight>
+      </View>
       <ScrollView style={{ marginTop: 10, paddingBottom: 100 }}>
         {blocks.map((block, i) => (
           <View
@@ -37,7 +52,7 @@ export default function WalletScreen() {
               borderRadius: 5,
               marginHorizontal: 20,
               marginVertical: 5,
-              padding: 8,
+              padding: 10,
             }}
           >
             <Text>{JSON.stringify(block)}</Text>
