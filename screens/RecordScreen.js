@@ -6,12 +6,13 @@ import {
   TouchableHighlight,
   View,
   ScrollView,
-  Share,
   AsyncStorage,
+  ToastAndroid,
 } from "react-native";
 import { Audio } from "expo-av";
 import * as SQLite from "expo-sqlite";
 import * as FileSystem from "expo-file-system";
+import * as Sharing from "expo-sharing";
 import { Ionicons } from "@expo/vector-icons";
 import { styles } from "../utils/styles";
 import { getMMSSFromMillis } from "../utils/getMMSSFromMillis";
@@ -59,10 +60,14 @@ export default class RecordScreen extends React.Component {
 
   update() {
     db.transaction((tx) => {
-      tx.executeSql(`select * from records`, [], (_, { rows: { _array } }) => {
-        this.setState({ playList: _array });
-        this._loadNewPlaybackInstance(false);
-      });
+      tx.executeSql(
+        `select * from records order by idx desc`,
+        [],
+        (_, { rows: { _array } }) => {
+          this.setState({ playList: _array });
+          this._loadNewPlaybackInstance(false);
+        }
+      );
     });
   }
 
@@ -193,6 +198,27 @@ export default class RecordScreen extends React.Component {
       }
     );
     await AsyncStorage.setItem("fileHash", md5);
+  }
+
+  async sharePressed(name) {
+    if (!(await Sharing.isAvailableAsync())) {
+      ToastAndroid.show("Sharing이 준비 되지 않았습니다", ToastAndroid.SHORT);
+      return;
+    }
+    await Sharing.shareAsync(name);
+    ToastAndroid.show("성공적으로 공유했습니다.", ToastAndroid.SHORT);
+  }
+
+  async trashPressed(name, idx) {
+    db.exec(
+      [{ sql: "delete from records where idx = ?", args: [idx] }],
+      false,
+      async (err) => {
+        if (err) console.log(err);
+        await FileSystem.deleteAsync(name);
+        ToastAndroid.show("성공적으로 삭제했습니다.", ToastAndroid.SHORT);
+      }
+    );
   }
 
   render() {
@@ -343,11 +369,7 @@ export default class RecordScreen extends React.Component {
                   this.update();
                 }}
               >
-                <Ionicons
-                  name="ios-refresh-circle"
-                  size={30}
-                  color="darkblue"
-                />
+                <Ionicons name="md-refresh" size={50} color="darkblue" />
               </TouchableHighlight>
             </View>
           </View>
@@ -379,6 +401,8 @@ export default class RecordScreen extends React.Component {
                   borderWidth: 1,
                   borderRadius: 5,
                   padding: 8,
+                  minWidth: DEVICE_WIDTH * 0.7,
+                  maxWidth: DEVICE_WIDTH * 0.7,
                 }}
                 onPress={() => {
                   this.fileClicked(i, name);
@@ -386,10 +410,19 @@ export default class RecordScreen extends React.Component {
               >
                 <Text>{name}</Text>
               </TouchableHighlight>
-              <TouchableHighlight style={{ marginHorizontal: 20 }}>
+              <TouchableHighlight
+                style={{ marginHorizontal: 20 }}
+                onPress={() => {
+                  this.sharePressed(FileSystem.documentDirectory + name);
+                }}
+              >
                 <Ionicons name="ios-share" size={40} color="green" />
               </TouchableHighlight>
-              <TouchableHighlight>
+              <TouchableHighlight
+                onPress={() => {
+                  this.trashPressed(FileSystem.documentDirectory + name, idx);
+                }}
+              >
                 <Ionicons name="ios-trash" size={40} color="red" />
               </TouchableHighlight>
             </View>
