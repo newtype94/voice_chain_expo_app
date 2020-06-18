@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -24,29 +24,32 @@ import { url, insertQuery } from "../utils/config";
 import { styles } from "../utils/styles";
 import { getMMSSFromMillis } from "../utils/getMMSSFromMillis";
 import { checkTable, resetDB } from "../utils/tableQuery";
+import calculateHash from "../utils/caculateHash";
 
 const { width: DEVICE_WIDTH, height: DEVICE_HEIGHT } = Dimensions.get("window");
 const db = SQLite.openDatabase("db.db");
 
 let wSocket = null;
 let recording = null;
+let logs = "";
 
 const NetworkScreen = (props) => {
   //About Socket
-  const [userId, setUserId] = React.useState("kyh");
-  const [connection, setConnection] = React.useState(false);
-  const [doClose, setDoClose] = React.useState(() => () => {});
+  const [userId, setUserId] = useState("kyh");
+  const [connection, setConnection] = useState(false);
+  const [doClose, setDoClose] = useState(() => () => {});
+  const [doSend, setDoSend] = useState(() => () => {});
 
   //About Recording
-  const [permitted, setPermitted] = React.useState(false);
-  const [fileName, setFileName] = React.useState("");
-  const [recordingDuration, setRecordingDuration] = React.useState(null);
-  const [isRecording, setIsRecording] = React.useState(false);
-  const [stage, setStage] = React.useState("");
+  const [permitted, setPermitted] = useState(false);
+  const [fileName, setFileName] = useState("");
+  const [recordingDuration, setRecordingDuration] = useState(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [stage, setStage] = useState("");
 
-  const [log, setLog] = React.useState("\n");
+  const [log, setLog] = useState("\n");
 
-  React.useEffect(() => {
+  useEffect(() => {
     checkTable();
     askForPermissions();
     updateStage();
@@ -60,32 +63,6 @@ const NetworkScreen = (props) => {
   async function askForPermissions() {
     const response = await Permissions.askAsync(Permissions.AUDIO_RECORDING);
     setPermitted(response.status === "granted");
-  }
-
-  function checkPlzHandler({
-    requester,
-    index,
-    tx_timeStamp,
-    tx_userId,
-    tx_voiceHash,
-  }) {
-    db.exec(
-      [{ sql: "SELECT * FROM blocks WHERE idx = ?", args: [index] }],
-      true,
-      (err, results) => {
-        let selected = results[0].rows[0];
-        const result =
-          selected.tx_timeStamp === tx_timeStamp &&
-          selected.tx_userId === tx_userId &&
-          selected.tx_voiceHash === tx_voiceHash;
-        wSocket.send(
-          JSON.stringify({
-            message: "check",
-            data: { requester, result, checker: userId },
-          })
-        );
-      }
-    );
   }
 
   function addPlzHandler(forAdd) {
@@ -115,28 +92,90 @@ const NetworkScreen = (props) => {
     const got = JSON.parse(e.data);
     switch (got.message) {
       case "checkPlz":
+        console.log("checkplz");
         setLog(
           log +
             "\n[다른 유저로부터 voice hash 검증 요청]\n" +
             JSON.stringify(got.data)
         );
         checkPlzHandler(got.data);
+        break;
       case "addPlz":
+        console.log("addplz");
         setLog(
           log +
             "\n[네트워크로부터 새로운 블록이 도착]\n" +
             JSON.stringify(got.data)
         );
         addPlzHandler(got.data);
+        break;
       case "checkResult":
+        console.log("checkResult");
         setLog(
           log +
             "\n[나의 voice hash 검증 요청에 대한 결과 도착]\n" +
             JSON.stringify(got.data)
         );
+        break;
       case "addFailed":
-        setLog(log + "\n[블록 전송 실패]");
+        console.log("addFailed");
+        setLog(log + "\n[블록 전송 실패]\n" + JSON.stringify(got.data));
+        break;
     }
+  }
+
+  function checkPlzHandler({
+    requester,
+    index,
+    tx_timeStamp,
+    tx_userId,
+    tx_voiceHash,
+  }) {
+    db.exec(
+      [{ sql: "SELECT * FROM blocks WHERE idx = ?", args: [index] }],
+      true,
+      (err, results) => {
+        let selected = results[0].rows[0];
+        const result =
+          selected.tx_timeStamp === tx_timeStamp &&
+          selected.tx_userId === tx_userId &&
+          selected.tx_voiceHash === tx_voiceHash;
+        doSend(
+          JSON.stringify({
+            message: "check",
+            data: { requester, result, checker: userId },
+          })
+        );
+      }
+    );
+  }
+
+  function checkRequest() {
+    let temp = stage.slice(0, stage.length - 4);
+    const [notUse, tx_userId, tx_timeStamp] = temp.split("___");
+    db.exec(
+      [
+        {
+          sql: "SELECT * FROM blocks WHERE tx_userId = ? AND tx_timeStamp = ?",
+          args: [tx_userId, parseInt(tx_timeStamp)],
+        },
+      ],
+      true,
+      async (err, result) => {
+        const hashGotFromFile = await AsyncStorage.getItem("fileHash");
+        doSend(
+          JSON.stringify({
+            message: "check",
+            data: {
+              index: result[0].rows[0].idx,
+              tx_voiceHash: hashGotFromFile,
+              tx_userId,
+              tx_timeStamp: parseInt(tx_timeStamp),
+            },
+          })
+        );
+      }
+    );
   }
 
   async function doOpen() {
@@ -205,6 +244,9 @@ const NetworkScreen = (props) => {
           setDoClose(() => () => {
             wSocket.close();
           });
+          setDoSend(() => (input) => {
+            wSocket.send(input);
+          });
         }
       }
     );
@@ -260,20 +302,38 @@ const NetworkScreen = (props) => {
     const info = await FileSystem.getInfoAsync(recording.getURI(), {
       md5: true,
     });
-
+    const now = new Date().getTime();
     const newName =
-      (fileName || "recorded") +
-      "___" +
-      userId +
-      "___" +
-      new Date().getTime() +
-      ".mp3";
+      (fileName || "recorded") + "___" + userId + "___" + now + ".mp3";
+
+    db.exec(
+      [{ sql: "SELECT * FROM blocks order by idx DESC limit 1", args: [] }],
+      true,
+      async (err, result) => {
+        // send to socket to broadcast my voice
+        const newBlock = {
+          index: result[0].rows[0].idx + 1,
+          hash: "",
+          previousHash: result[0].rows[0].hash,
+          createdAt: new Date().getTime(),
+          tx_userId: userId,
+          tx_voiceHash: info.md5,
+          tx_timeStamp: now,
+        };
+        newBlock.hash = await calculateHash(newBlock);
+        doSend(
+          JSON.stringify({
+            message: "add",
+            data: newBlock,
+          })
+        );
+      }
+    );
 
     await FileSystem.moveAsync({
       from: info.uri,
       to: FileSystem.documentDirectory + newName,
     });
-
     db.exec(
       [
         {
@@ -302,11 +362,6 @@ const NetworkScreen = (props) => {
   async function onFindPressed() {
     const get = await DocumentPicker.getDocumentAsync();
     console.log(get);
-  }
-
-  function onRecordPressed() {
-    if (isRecording) finishRecording();
-    else startRecording();
   }
 
   function _getRecordingTimestamp() {
@@ -378,7 +433,7 @@ const NetworkScreen = (props) => {
             borderRadius: 5,
             padding: 8,
           }}
-          onPress={doClose}
+          onPress={checkRequest}
         >
           <Text style={{ fontSize: 17 }}>stage 음원 검증</Text>
         </TouchableHighlight>
@@ -407,7 +462,10 @@ const NetworkScreen = (props) => {
             color="black"
           />
         </TouchableHighlight>
-        <TouchableHighlight underlayColor="skyblue" onPress={onRecordPressed}>
+        <TouchableHighlight
+          underlayColor="skyblue"
+          onPress={isRecording ? finishRecording : startRecording}
+        >
           <Ionicons
             name="ios-mic"
             size={80}

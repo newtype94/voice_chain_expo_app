@@ -186,6 +186,13 @@ export default class RecordScreen extends React.Component {
       this._updatePlaybackInstanceForIndex(this.state.shouldPlay);
     }
     await AsyncStorage.setItem("fileName", name);
+    const { md5 } = await FileSystem.getInfoAsync(
+      FileSystem.documentDirectory + name,
+      {
+        md5: true,
+      }
+    );
+    await AsyncStorage.setItem("fileHash", md5);
   }
 
   render() {

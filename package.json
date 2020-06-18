@@ -22,6 +22,7 @@
     "expo-asset": "~8.1.0",
     "expo-av": "^8.1.0",
     "expo-constants": "~9.0.0",
+    "expo-crypto": "^8.1.0",
     "expo-document-picker": "^8.1.0",
     "expo-file-system": "^8.1.0",
     "expo-font": "~8.1.0",

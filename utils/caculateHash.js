@@ -1,6 +1,6 @@
-import * as CryptoJS from "crypto-js";
+import * as Crypto from "expo-crypto";
 
-const calculateHash = ({
+const calculateHash = async ({
   index,
   previousHash,
   createdAt,
@@ -8,8 +8,9 @@ const calculateHash = ({
   tx_voiceHash,
   tx_timeStamp,
 }) =>
-  CryptoJS.SHA256(
+  await Crypto.digestStringAsync(
+    Crypto.CryptoDigestAlgorithm.SHA256,
     index + previousHash + createdAt + tx_userId + tx_voiceHash + tx_timeStamp
-  ).toString();
+  );
 
-export { calculateHash };
+export default calculateHash;
