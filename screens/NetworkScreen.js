@@ -3,10 +3,8 @@ import {
   View,
   Text,
   TextInput,
-  Dimensions,
   ToastAndroid,
   TouchableHighlight,
-  ScrollView,
   AsyncStorage,
 } from "react-native";
 import { Audio } from "expo-av";
@@ -25,7 +23,6 @@ import { checkTable, resetDB } from "../utils/tableQuery";
 import calculateHash from "../utils/caculateHash";
 import LogScreen from "./LogScreen";
 
-const { width: DEVICE_WIDTH, height: DEVICE_HEIGHT } = Dimensions.get("window");
 const db = SQLite.openDatabase("db.db");
 
 let wSocket = null;
